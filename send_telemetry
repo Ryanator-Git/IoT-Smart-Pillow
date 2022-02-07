@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+from google.cloud import pubsub_v1
+import datetime
+import json
+import sensordata
+import time
+from datetime import datetime
+
+#print(sensordata.PressureSensors())
+
+project_id = "fifth-point-313802" # enter your project id here
+topic_name = "TheSmartPillow" # enter the name of the topic that you created
+ 
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(project_id, topic_name)
+ 
+futures = dict()
+ 
+def get_callback(f, data):
+    def callback(f):
+        try:
+            # print(f.result())
+            futures.pop(data)
+        except:
+            print("Please handle {} for {}.".format(f.exception(), data))
+ 
+    return callback
+ 
+while True:
+    time.sleep(1)
+    sensor_1 = int(sensordata.ReadChannel(0))
+    sensor_2 = int(sensordata.ReadChannel(1))
+    sensor_3 = int(sensordata.ReadChannel(2))
+    sensor_4 = int(sensordata.ReadChannel(3))
+    volt_1 = float(sensordata.ConvertVolts(sensordata.ReadChannel(0), 2))
+    volt_2 = float(sensordata.ConvertVolts(sensordata.ReadChannel(1), 2))
+    volt_3 = float(sensordata.ConvertVolts(sensordata.ReadChannel(2), 2))
+    volt_4 = float(sensordata.ConvertVolts(sensordata.ReadChannel(3), 2))
+    #timenow = int(time.time())
+    timenow = int(time.strftime("%y%m%d%H%M%S"))
+    data = {"Timestream":timenow, "Sensor_1" : sensor_1, "Sensor_2" : sensor_2, "Sensor_3" : sensor_3,"Sensor_4" : sensor_4, 
+    "Volt_1": volt_1, "Volt_2": volt_2, "Volt_3": volt_3, "Volt_4": volt_4}
+    print(data)
+    # When you publish a message, the client returns a future.
+    future = publisher.publish(
+        topic_path, data=(json.dumps(data)).encode("utf-8")) # data must be a bytestring.
+    # Publish failures shall be handled in the callback function.
+    future.add_done_callback(get_callback(future, data))
+    time.sleep(0.5)
+# Wait for all the publish futures to resolve before exiting.
+while futures:
+    time.sleep(0.5)
+ 
+print("Published message with error handler.")
